@@ -1,0 +1,105 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: test ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Matches clean-server's matrix. Windows lands at M1 with the
+        # reload-socket work (clean-server PLAN.md §8 question #8).
+        os: [macos-14, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: clean-runtime
+
+      # The hosts are path dependencies while everything is pre-1.0, and each
+      # host in turn depends on clean-host-core the same way. CI must lay the
+      # siblings out exactly as a developer's machine does. These become git or
+      # registry pins at M1, and this block shrinks to nothing.
+      #
+      # Deploy keys rather than a PAT: each is bound to one repository and
+      # registered read-only, so a leak exposes read access to that repo alone.
+      - name: check out clean-server
+        uses: actions/checkout@v4
+        with:
+          repository: Ivan-Pasco/clean-server
+          path: clean-server
+          ssh-key: ${{ secrets.CLEAN_SERVER_DEPLOY_KEY }}
+
+      - name: check out clean-host-core
+        uses: actions/checkout@v4
+        with:
+          repository: Ivan-Pasco/clean-host-core
+          path: clean-host-core
+          ssh-key: ${{ secrets.CLEAN_HOST_CORE_DEPLOY_KEY }}
+
+      - name: install rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: clean-runtime
+
+      # Scoped to this package on purpose. `cargo fmt --all` follows the
+      # sibling path dependencies into clean-server and clean-host-core, so a
+      # formatting drift in another repo would fail this one's CI — a failure
+      # this repo cannot fix. Each repo formats itself.
+      - name: fmt
+        working-directory: clean-runtime
+        run: cargo fmt -p clean-runtime -- --check
+
+      - name: clippy
+        working-directory: clean-runtime
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: test
+        working-directory: clean-runtime
+        run: cargo test --workspace
+
+      # The dispatch contract, checked end to end rather than by unit test:
+      # both accepted CLI shapes must resolve the same configuration and boot
+      # the same component. This is the guarantee Manager and Cloud each depend
+      # on from opposite directions, so it gates every commit.
+      - name: both CLI shapes boot the demo component
+        working-directory: clean-runtime
+        run: |
+          cargo build --release --workspace
+          demo="../clean-server/testing/demo-site"
+          # Cloud's shape: bare positional config.
+          ./target/release/clean-runtime "$demo/host.toml" --check
+          # Manager §00.13 step 5: --world plus explicit --config.
+          ./target/release/clean-runtime \
+            --world=server "$demo/site.wasm" --config="$demo/host.toml" --check
+
+      # An unimplemented world must fail as "not implemented", not as "unknown
+      # world" — they need different fixes, and the messages are what Manager
+      # surfaces to users.
+      - name: unimplemented worlds fail distinguishably
+        working-directory: clean-runtime
+        run: |
+          demo="../clean-server/testing/demo-site"
+          if ./target/release/clean-runtime --world=worker "$demo/host.toml" 2>err.txt; then
+            echo "expected --world=worker to fail"; exit 1
+          fi
+          grep -q "no host for world 'worker'" err.txt || {
+            echo "expected a not-implemented message, got:"; cat err.txt; exit 1; }
+          if ./target/release/clean-runtime --world=srever "$demo/host.toml" 2>err2.txt; then
+            echo "expected --world=srever to fail"; exit 1
+          fi
+          grep -q "unknown world" err2.txt || {
+            echo "expected an unknown-world message, got:"; cat err2.txt; exit 1; }
+          echo "both failure modes are distinguishable"

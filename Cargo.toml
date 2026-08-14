@@ -1,0 +1,35 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/clean-runtime",
+]
+
+[workspace.package]
+# Tracks the host versions it bundles while there is effectively one host.
+# Clean Cloud's node agent probes `clean-runtime --version` to satisfy each
+# package's `build.runtime_version` pin, so this number is a contract with
+# every already-built `.clapp` — see docs/versioning.md before bumping it.
+version = "0.7.0"
+edition = "2021"
+# Inherited from clean-host-core via the hosts, which needs 1.94 for wasmtime 47.
+rust-version = "1.94"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Ivan-Pasco/clean-runtime"
+
+[workspace.dependencies]
+# Sibling repos, developed side by side while everything is pre-1.0. These
+# become git or registry pins at M1 — the same convention clean-server already
+# uses for clean-host-core, and clean-framework for cln-shared / cln-layout.
+#
+# `clean-cli` and `clean-worker` join this list as they land; adding one is a
+# compile error in `world.rs` until it is wired, which is deliberate.
+clean-server = { path = "../clean-server/crates/clean-server" }
+
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
