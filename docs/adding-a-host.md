@@ -59,6 +59,14 @@ warning that fires on correct usage is worse than no warning.
 deploy key. Adding a host means adding a checkout step and a
 `<HOST>_DEPLOY_KEY` secret.
 
+> **Push the host repo first.** CI checks out each sibling's **default
+> branch**, not your working tree. A local `cargo build` compiles against
+> whatever is on disk, so a change that spans this repo and a host repo builds
+> fine locally and fails in CI with a missing item — the first push of this
+> repo failed exactly that way (`cannot find entrypoint in clean_server`,
+> because clean-server's commit had not landed yet). Land the host change,
+> then the runtime change.
+
 Extend the two behavioral CI steps as well:
 
 - **"both CLI shapes boot the demo component"** — add an equivalent for the new
