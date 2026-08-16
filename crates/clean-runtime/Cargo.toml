@@ -12,10 +12,11 @@ name = "clean-runtime"
 path = "src/main.rs"
 
 [dependencies]
-# The only host implemented today. `clean-cli`, `clean-worker`, `clean-browser`
-# and `clean-edge` join this list as their repos land; the dispatch table in
-# `world.rs` is the single place that changes.
+# The hosts implemented today. `clean-worker`, `clean-browser` and `clean-edge`
+# join this list as their repos land; the dispatch table in `world.rs` is the
+# single place that changes.
 clean-server = { workspace = true }
+clean-cli = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true }

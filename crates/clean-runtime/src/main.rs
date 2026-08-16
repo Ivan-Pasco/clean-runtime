@@ -6,9 +6,13 @@
 //! `[target] host` value, or a host registry key. Each host inside keeps its
 //! own canonical name and publishes its own `host.wit`.
 //!
-//! Today exactly one host exists (`clean-server`), so `--world=server` is the
-//! only world that runs. The other four parse and fail with a message naming
+//! Today two hosts exist (`clean-server` and `clean-cli`), so `--world=server`
+//! and `--world=cli` run. The other three parse and fail with a message naming
 //! the gap rather than pretending to be unknown; see `world.rs`.
+//!
+//! `clean-cli` implements the `cli-default` world only; a guest built for the
+//! named-subcommand `cli` world is refused by that host with a message naming
+//! the missing mode.
 //!
 //! # Two accepted CLI shapes
 //!
@@ -113,9 +117,10 @@ fn main() -> ExitCode {
 
     match cli.world {
         World::Server => run_server(&config, &cli),
+        World::Cli => run_cli(&config, &cli),
         // Unreachable while `is_implemented` gates the match above, but written
         // out so adding a host crate is a compile error here until it is wired.
-        World::Cli | World::Worker | World::Browser | World::Edge => {
+        World::Worker | World::Browser | World::Edge => {
             eprintln!("error: world '{}' has no dispatch arm", cli.world);
             ExitCode::FAILURE
         }
@@ -200,6 +205,27 @@ fn run_server(config: &Path, cli: &Cli) -> ExitCode {
     }
 
     clean_server::entrypoint::run(config, cli.check)
+}
+
+/// Hand off to the `clean-cli` host.
+///
+/// Unlike `run_server`, guest arguments are forwarded rather than warned about:
+/// argv is the entire point of a CLI host, so a warning here would fire on
+/// correct usage. `--assets` still does not apply — a CLI invocation serves
+/// nothing — so that one is reported.
+///
+/// The exit code is the guest's own (CLIH-11), or 126 if it trapped (CLIH-14).
+/// It passes through untouched: `cln run` streams it back to the user's shell,
+/// and remapping it here would make a guest's `exit 3` unobservable.
+fn run_cli(config: &Path, cli: &Cli) -> ExitCode {
+    if cli.assets.is_some() {
+        eprintln!(
+            "warning: --assets is not read by clean-cli; \
+             a command-line invocation serves no static assets"
+        );
+    }
+
+    clean_cli::entrypoint::run(config, cli.check, &cli.guest_args)
 }
 
 #[cfg(test)]

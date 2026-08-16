@@ -37,6 +37,13 @@ jobs:
           path: clean-server
           ssh-key: ${{ secrets.CLEAN_SERVER_DEPLOY_KEY }}
 
+      - name: check out clean-cli
+        uses: actions/checkout@v4
+        with:
+          repository: Ivan-Pasco/clean-cli
+          path: clean-cli
+          ssh-key: ${{ secrets.CLEAN_CLI_DEPLOY_KEY }}
+
       - name: check out clean-host-core
         uses: actions/checkout@v4
         with:
@@ -84,6 +91,48 @@ jobs:
           # Manager §00.13 step 5: --world plus explicit --config.
           ./target/release/clean-runtime \
             --world=server "$demo/site.wasm" --config="$demo/host.toml" --check
+
+      - name: install wasm-tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools
+
+      # The same dispatch guarantee for the CLI host, against a real component
+      # from its repo. Unlike the server check this goes past `--check` to a
+      # full run: a CLI host's contract is its stdout and its exit code, and
+      # neither is exercised by validation alone.
+      - name: the cli world runs its host's fixture
+        working-directory: clean-runtime
+        run: |
+          hello="../clean-cli/testing/hello"
+          bash "$hello/build.sh"
+
+          ./target/release/clean-runtime \
+            --world=cli "$hello/hello.wasm" --config="$hello/host.toml" --check
+
+          ./target/release/clean-runtime \
+            --world=cli "$hello/hello.wasm" --config="$hello/host.toml" > out.txt
+          printf 'hello\n' > expected.txt
+          diff expected.txt out.txt || {
+            echo "guest stdout was not byte-exact through the runtime:"
+            od -c out.txt; exit 1; }
+          echo "cli world dispatches and stdout is byte-exact"
+
+      # Guest arguments are load-bearing for the CLI host: `run_cli` forwards
+      # them rather than warning, so a post-`--` flag that collides with one of
+      # the runtime's own must reach the guest instead of being parsed here.
+      - name: guest arguments reach the cli host rather than the runtime
+        working-directory: clean-runtime
+        run: |
+          hello="../clean-cli/testing/hello"
+          ./target/release/clean-runtime \
+            --world=cli "$hello/hello.wasm" --config="$hello/host.toml" \
+            -- --check --config /nonexistent > args.txt
+          printf 'hello\n' > expected.txt
+          diff expected.txt args.txt || {
+            echo "post-\`--\` flags were consumed by the runtime:"
+            cat args.txt; exit 1; }
+          echo "guest arguments forwarded, not parsed"
 
       # An unimplemented world must fail as "not implemented", not as "unknown
       # world" — they need different fixes, and the messages are what Manager

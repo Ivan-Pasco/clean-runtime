@@ -53,16 +53,37 @@ That makes "what does `clean-runtime 0.8.0` mean?" a real question, and it is
    answers "runtime 0.8.0 contains server 0.7.2, cli 0.1.0" for tooling rather
    than for humans reading a filename.
 
-**Recommendation when this is decided:** (1) plus the matrix from (3) once
-more than one host ships, treating `BUNDLED-HOSTS.txt` as the interim matrix.
-(2) is a trap — it reads as informative and stops being true exactly when the
-system gets complicated.
+## Decided: option (1), with `BUNDLED-HOSTS.txt` as the interim matrix
 
-Until it is settled, the operating rule is narrow and safe:
+Settled at the `0.7.0` release — the first release to bundle two hosts, and the
+first published release of `clean-runtime` at all. The rule from here:
 
-> The runtime version tracks `clean-server`'s while `clean-server` is the only
-> implemented host. The first release that bundles a second host must resolve
-> this question first.
+> **`clean-runtime` versions independently of the hosts inside it.** A release
+> bumps because the runtime shipped, not because any particular host changed.
+> `BUNDLED-HOSTS.txt` in every archive records which host versions and commits
+> went in, and serves as the version matrix until a published one exists.
+
+Option (2) was rejected as a trap: tracking the highest-versioned host reads as
+informative and stops being true exactly when two hosts start moving at
+different speeds, which is the reason the repos were split. Option (3) remains
+the destination — `BUNDLED-HOSTS.txt` is the interim form of that matrix, not a
+replacement for it.
+
+Two consequences worth stating plainly:
+
+- A host bugfix does not reach users without a runtime release. That is the
+  accepted cost of a fat binary; it is not a defect to work around.
+- `clean-runtime 0.7.0` does not tell you which `clean-server` is inside. Read
+  `BUNDLED-HOSTS.txt` from the archive. Do not infer it from the number.
+
+### Why the first published release is 0.7.0, not 0.1.0
+
+`0.7.0` was already the workspace version, inherited from `clean-server`, and
+every `.clapp` built so far pins `runtime_version = "0.7.0"`. Publishing this
+first release under any other number would strand all of them the day Cloud
+began enforcing pins — the exact failure the section above warns about. So the
+first public runtime release deliberately keeps the number the ecosystem
+already points at, and independent versioning starts from `0.7.1` onward.
 
 ## Rules that hold regardless
 

@@ -37,16 +37,16 @@ impl World {
 
     /// Whether this build contains a host for the world.
     ///
-    /// Only `clean-server` exists today. This is a plain match rather than a
-    /// registry because the compiler should force an update here when a host
-    /// crate is added.
+    /// `clean-server` and `clean-cli` exist today. This is a plain match rather
+    /// than a registry because the compiler should force an update here when a
+    /// host crate is added.
     ///
     /// Adding a host means: a dependency in the workspace `Cargo.toml`, an arm
     /// here, an arm in `main.rs`'s dispatch, and a `run_*` delegation. The
     /// `match` in `main.rs` is exhaustive, so the compiler will not let a new
     /// world be added without wiring it. See `docs/adding-a-host.md`.
     pub fn is_implemented(self) -> bool {
-        matches!(self, World::Server)
+        matches!(self, World::Server | World::Cli)
     }
 
     /// Every world, for help text and error messages.
@@ -142,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    fn only_server_is_implemented_today() {
-        assert_eq!(World::implemented(), vec![World::Server]);
+    fn server_and_cli_are_implemented_today() {
+        assert_eq!(World::implemented(), vec![World::Server, World::Cli]);
     }
 }

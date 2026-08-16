@@ -57,6 +57,13 @@ jobs:
           path: clean-server
           ssh-key: ${{ secrets.CLEAN_SERVER_DEPLOY_KEY }}
 
+      - name: check out clean-cli
+        uses: actions/checkout@v4
+        with:
+          repository: Ivan-Pasco/clean-cli
+          path: clean-cli
+          ssh-key: ${{ secrets.CLEAN_CLI_DEPLOY_KEY }}
+
       - name: check out clean-host-core
         uses: actions/checkout@v4
         with:
@@ -117,6 +124,9 @@ jobs:
             printf "  clean-server %s (%s)\n" \
               "$(grep -m1 '^version' ../clean-server/Cargo.toml | cut -d'"' -f2)" \
               "$(git -C ../clean-server rev-parse --short HEAD)"
+            printf "  clean-cli    %s (%s)\n" \
+              "$(grep -m1 '^version' ../clean-cli/Cargo.toml | cut -d'"' -f2)" \
+              "$(git -C ../clean-cli rev-parse --short HEAD)"
             echo ""
             echo "clean-host-core $(grep -m1 '^version' ../clean-host-core/Cargo.toml | cut -d'"' -f2) ($(git -C ../clean-host-core rev-parse --short HEAD))"
           } > BUNDLED-HOSTS.txt
@@ -134,6 +144,7 @@ jobs:
           # host.wit the host's declaration artifact, and Manager caches it
           # under ~/.cln/host-wit/. One file per host, named for the host.
           cp ../clean-server/host.wit "$staging/clean-server.host.wit"
+          cp ../clean-cli/host.wit "$staging/clean-cli.host.wit"
 
           mkdir -p dist
           asset="clean-runtime-${version}-${{ matrix.platform }}.${{ matrix.ext }}"

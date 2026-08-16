@@ -21,9 +21,10 @@ repository = "https://github.com/Ivan-Pasco/clean-runtime"
 # become git or registry pins at M1 — the same convention clean-server already
 # uses for clean-host-core, and clean-framework for cln-shared / cln-layout.
 #
-# `clean-cli` and `clean-worker` join this list as they land; adding one is a
-# compile error in `world.rs` until it is wired, which is deliberate.
+# `clean-worker` joins this list as it lands; adding one is a compile error in
+# `world.rs` until it is wired, which is deliberate.
 clean-server = { path = "../clean-server/crates/clean-server" }
+clean-cli = { path = "../clean-cli/crates/clean-cli" }
 
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }

@@ -19,7 +19,7 @@ this.
 | World | Host | Repository | Status |
 |---|---|---|---|
 | `server` | `clean-server` | [clean-server](../clean-server/) | implemented |
-| `cli` | `clean-cli` | — | specified, not implemented |
+| `cli` | `clean-cli` | [clean-cli](../clean-cli/) | implemented (`cli-default` world only) |
 | `worker` | `clean-worker` | — | specified, not implemented |
 | `browser` | `clean-browser` | — | specified, not implemented |
 | `edge` | `clean-edge` | — | specified, not implemented |
@@ -27,6 +27,12 @@ this.
 Unimplemented worlds parse and then fail with a message naming the gap,
 deliberately distinct from the unknown-world error for a typo — one is a
 missing feature, the other a spelling mistake, and they need different fixes.
+
+`clean-cli` implements the `cli-default` world (a guest exporting
+`run(argv, stdin-tty) -> u8`). The named-subcommand `cli` world is not
+implemented; under CLIH-20 a guest exports `commands` *or* `default` and never
+both, so the two are disjoint modes and a `commands` guest is refused by that
+host with a message naming the missing mode.
 
 Adding a host: see [docs/adding-a-host.md](docs/adding-a-host.md).
 
@@ -56,11 +62,13 @@ file is worse than refusing:
 | `clean-runtime app.wasm` | error — a component with no configuration (CLNH-13) |
 | `clean-runtime a.toml --config b.toml` | error — two configuration paths |
 
-**Flags the server host ignores.** `--assets` and post-`--` guest arguments are
-accepted for Manager's shape but warn: `clean-server` reads its asset root
-from `[assets] root` in `host.toml` and does not forward argv to the guest.
-Accepting them silently would be worse than saying so. Both will matter for
-`clean-cli`.
+**Flags a host ignores.** A flag accepted for Manager's shape but unread by the
+chosen host warns rather than passing silently:
+
+| Host | `--assets` | post-`--` guest arguments |
+|---|---|---|
+| `clean-server` | warns — asset root comes from `[assets] root` | warns — does not forward argv |
+| `clean-cli` | warns — a command invocation serves no assets | **forwarded**, they are the point of a CLI |
 
 ## Building
 
@@ -72,6 +80,7 @@ siblings:
 Dev/Clean Language/
 ├── clean-runtime/     # this repo
 ├── clean-server/
+├── clean-cli/
 └── clean-host-core/
 ```
 
@@ -90,6 +99,14 @@ Verify against the real demo component in `clean-server`:
 demo=../clean-server/testing/demo-site
 ./target/release/clean-runtime --world=server "$demo/site.wasm" --config="$demo/host.toml"
 curl -i http://127.0.0.1:3100/
+```
+
+And against the CLI host's fixture, which prints `hello` and exits 0:
+
+```bash
+hello=../clean-cli/testing/hello
+bash "$hello/build.sh"   # once, to produce hello.wasm
+./target/release/clean-runtime --world=cli "$hello/hello.wasm" --config="$hello/host.toml"
 ```
 
 ## Versioning and releases
@@ -113,6 +130,17 @@ Each archive carries the binary, every bundled host's `host.wit` (named
 `<host>.host.wit`, for Manager's `~/.cln/host-wit/` cache), and
 `BUNDLED-HOSTS.txt` recording the exact host versions and commits inside — the
 build is the only place that information exists once the binary is linked.
+
+Because the archive bundles the hosts, **the release checks out every host repo
+too** (`clean-server`, `clean-cli`, and `clean-host-core` beneath them). Each
+host contributes one `host.wit`. Adding a host therefore means editing
+`release.yml` as well as the Rust — see
+[docs/adding-a-host.md](docs/adding-a-host.md), which is the authoritative
+contract for that.
+
+The runtime versions **independently** of the hosts it bundles: a bump means
+the runtime shipped, not that any given host changed. `BUNDLED-HOSTS.txt` is
+how you find out what was inside — never infer it from the runtime number.
 
 The release workflow **fails** if the binary's reported version does not match
 the tag: a mismatch would silently break every deploy pinned to that release.
